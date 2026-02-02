@@ -1,0 +1,41 @@
+name: 自动备份Twitter到百度网盘
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天凌晨0点自动运行（北京时间早上8点）
+  workflow_dispatch:      # 也可以手动点击运行
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 准备工作环境
+        uses: actions/checkout@v4
+        
+      - name: 安装Python和小工具
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 安装备份需要的魔法库
+        run: |
+          pip install --upgrade pip
+          pip install ntscraper bypy
+          
+      - name: 创建备份脚本
+        run: |
+          echo "from ntscraper import Nitter; import json; import os; from datetime import datetime" > backup.py
+          echo "scraper = Nitter()" >> backup.py
+          echo "tweets = scraper.get_tweets('${{ secrets.TWITTER_USERNAME }}', mode='user', number=100)" >> backup.py
+          echo "today = datetime.now().strftime('%Y-%m-%d')" >> backup.py
+          echo "filename = f'twitter_backup_{today}.json'" >> backup.py
+          echo "with open(filename, 'w', encoding='utf-8') as f:" >> backup.py
+          echo "    json.dump(tweets, f, ensure_ascii=False, indent=2)" >> backup.py
+          
+      - name: 连接百度网盘并上传备份
+        run: |
+          bypy authorize --code ${{ secrets.BAIDU_TOKEN }}
+          bypy upload twitter_backup_*.json /twitter-backups/
+          
+      - name: 显示备份成功信息
+        run: echo "🎉 备份完成！文件已经安全存到百度网盘啦！"
+        
