@@ -36,19 +36,20 @@ jobs:
           echo "    print(f'❌ 抓取Twitter内容失败: {e}')" >> backup.py
           echo "    exit(0)  # 即使抓取失败，也不要让整个工作流失败" >> backup.py
           
-      - name: 连接百度网盘并上传备份（修复授权问题）
+      - name: 连接百度网盘并上传备份
         run: |
-          # 正确的授权方式
-          echo "${{ secrets.BAIDU_TOKEN }}" | bypy authorize
-          
-          # 检查文件是否存在，再上传
-          if [ -f twitter_backup_*.json ]; then
-            bypy mkdir -p /twitter-backups/  # 确保目录存在
-            bypy upload twitter_backup_*.json /twitter-backups/
-            echo "🎉 备份完成！文件已经安全存到百度网盘啦！"
-          else
-            echo "⚠️ 没有找到备份文件，可能是Twitter抓取失败了"
-          fi
+        # 修复授权方式，避免exit code 40
+         bypy authorize --refresh --code "${{ secrets.BAIDU_TOKEN }}"
+         # 确保目录存在
+         bypy mkdir -p /twitter-backups/ || true
+        # 检查文件再上传
+        if [ -f twitter_backup_*.json ]; then
+          bypy upload twitter_backup_*.json /twitter-backups/
+          echo "🎉 上传成功！"
+       else
+         echo "⚠️ 没有找到备份文件"
+      fi
+    
           
       - name: 显示备份结果
         run: |
