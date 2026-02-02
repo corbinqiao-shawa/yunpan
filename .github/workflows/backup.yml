@@ -19,7 +19,8 @@ jobs:
       - name: 安装备份需要的魔法库（最新版）
         run: |
           pip install --upgrade pip
-          pip install ntscraper==0.4.0 bypy
+          pip install --upgrade bypy ntscraper
+    
           
       - name: 创建备份脚本（带错误处理）
         run: |
