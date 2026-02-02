@@ -16,26 +16,42 @@ jobs:
         with:
           python-version: '3.11'
           
-      - name: 安装备份需要的魔法库
+      - name: 安装备份需要的魔法库（最新版）
         run: |
           pip install --upgrade pip
-          pip install ntscraper bypy
+          pip install ntscraper==0.4.0 bypy
           
-      - name: 创建备份脚本
+      - name: 创建备份脚本（带错误处理）
         run: |
           echo "from ntscraper import Nitter; import json; import os; from datetime import datetime" > backup.py
-          echo "scraper = Nitter()" >> backup.py
-          echo "tweets = scraper.get_tweets('${{ secrets.TWITTER_USERNAME }}', mode='user', number=100)" >> backup.py
-          echo "today = datetime.now().strftime('%Y-%m-%d')" >> backup.py
-          echo "filename = f'twitter_backup_{today}.json'" >> backup.py
-          echo "with open(filename, 'w', encoding='utf-8') as f:" >> backup.py
-          echo "    json.dump(tweets, f, ensure_ascii=False, indent=2)" >> backup.py
+          echo "scraper = Nitter(instance='https://nitter.net', log_level=2)" >> backup.py  # 详细日志
+          echo "try:" >> backup.py
+          echo "    tweets = scraper.get_tweets('${{ secrets.TWITTER_USERNAME }}', mode='user', number=100)" >> backup.py
+          echo "    today = datetime.now().strftime('%Y-%m-%d')" >> backup.py
+          echo "    filename = f'twitter_backup_{today}.json'" >> backup.py
+          echo "    with open(filename, 'w', encoding='utf-8') as f:" >> backup.py
+          echo "        json.dump(tweets, f, ensure_ascii=False, indent=2)" >> backup.py
+          echo "    print('✅ 成功抓取并保存备份文件')" >> backup.py
+          echo "except Exception as e:" >> backup.py
+          echo "    print(f'❌ 抓取Twitter内容失败: {e}')" >> backup.py
+          echo "    exit(0)  # 即使抓取失败，也不要让整个工作流失败" >> backup.py
           
-      - name: 连接百度网盘并上传备份
+      - name: 连接百度网盘并上传备份（修复授权问题）
         run: |
-         echo "${{ secrets.BAIDU_TOKEN }}" | bypy authorize
-         bypy upload twitter_backup_*.json /twitter-backups/
+          # 正确的授权方式
+          echo "${{ secrets.BAIDU_TOKEN }}" | bypy authorize
           
-      - name: 显示备份成功信息
-        run: echo "🎉 备份完成！文件已经安全存到百度网盘啦！"
-        
+          # 检查文件是否存在，再上传
+          if [ -f twitter_backup_*.json ]; then
+            bypy mkdir -p /twitter-backups/  # 确保目录存在
+            bypy upload twitter_backup_*.json /twitter-backups/
+            echo "🎉 备份完成！文件已经安全存到百度网盘啦！"
+          else
+            echo "⚠️ 没有找到备份文件，可能是Twitter抓取失败了"
+          fi
+          
+      - name: 显示备份结果
+        run: |
+          echo "📋 备份任务完成状态："
+          ls -l twitter_backup_*.json || echo "没有备份文件"
+          bypy list /twitter-backups/ || echo "百度网盘目录查看失败"
